@@ -11,14 +11,14 @@ import java.util.Map;
 
 class SunCalc {
 
-    public double PI  = Math.PI,
+    private double PI  = Math.PI,
                   rad = PI / 180;
 
-    public int J2000 = 2451545;
+    private int J2000 = 2451545;
 
 
     //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_1
-    public long toJulian(LocalDate date) {
+    private long toJulian(LocalDate date) {
         int year = date.getYear(),
             month = date.getMonthValue(),
             day = date.getDayOfMonth();
@@ -37,7 +37,7 @@ class SunCalc {
     }
 
     //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_2
-    public LocalDate fromJulian(long jdn) { //jdn = julian day number
+    private LocalDate fromJulian(long jdn) { //jdn = julian day number
         long k3 = 4 * (jdn - 1721120) + 3;
         int x3 = Math.round(k3 / 146097);
 
@@ -57,7 +57,7 @@ class SunCalc {
         return date;
     }
 
-    public long toDays(LocalDate date) {
+    private long toDays(LocalDate date) {
         return toJulian(date) - J2000;
     }
 
@@ -66,27 +66,27 @@ class SunCalc {
     double e = rad * 23.4397; //Schieflage der Erde
 
     
-    public double rightAscension(double l, int b) {
+    private double rightAscension(double l, int b) {
         return Math.atan2( Math.sin(l) * Math.cos(e) - Math.tan(b) * Math.sin(e), Math.cos(l));
     }
 
-    public double declination(double l, int b) {
+    private double declination(double l, int b) {
         return Math.asin(Math.sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l));
     }
 
-    public double azimuth(int H, int phi, int dec) {
+    private double azimuth(double H, double phi, double dec) {
         return Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(dec) * Math.cos(phi));
     }
 
-    public double altitude(int H, int phi, int dec) {
+    private double altitude(double H, double phi, double dec) {
         return Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H));
     }
 
-    public double sidereadlTime(int d, int lw) {
+    private double sidereadlTime(double d, double lw) {
         return rad * (280.16 + 360.9856235 * d) - lw;
     }
 
-    public double astroRefraction(int h) {
+    private double astroRefraction(int h) {
         if (h < 0) // the following formula works for positive altitudes only.
         h = 0; // if h = -0.08901179 a div/0 would occur.
 
@@ -98,25 +98,59 @@ class SunCalc {
 
 
     // General sun Calculations
-    public double solarMeanAnomaly(int d) {
+    private double solarMeanAnomaly(double d) {
         return rad * (357.5291 + 0.98560028 * d); 
     }
 
-    public double eclipticLongitude(double M) {
+    private double eclipticLongitude(double M) {
         double C = rad * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M)), // equation of center
         P = rad * 102.9372; // perihelion of the Earth
 
         return M + C + P + PI;
     }
 
-    public HashMap<String,Double> sunCoords(int d) {
-        double M = solarMeanAnomaly(d),
-            L = eclipticLongitude(M);
 
-        HashMap<String, Double> map = new HashMap<String, Double>();
-        map.put("dec", declination(L, 0));
-        map.put("ra", rightAscension(L, 0));
+    public class SunCoords {
+        double declination;
+        double righAscension;
 
-        return map;
+        SunCoords(){}
+        SunCoords(double dec, double ra) {
+            this.declination = dec;
+            this.righAscension = ra;
+        }
+
+        public SunCoords setCoordinates(double d) {
+            double M = solarMeanAnomaly(d),
+                L = eclipticLongitude(M);
+    
+            SunCoords coords = new SunCoords(L, 0);
+    
+            return coords;
+        }
+    }
+
+
+    public class SunPosition {
+        double azimuth;
+        double altitude;
+
+        SunPosition(){}
+        SunPosition(double azimuth, double altitude){
+            this.azimuth = azimuth;
+            this.altitude = altitude;
+        }
+
+        public SunPosition getPosition(LocalDate date, double lat, double lng) {
+            double  lw  = rad * -lng,
+                    phi = rad * lat,
+                    d   = toDays(date);
+    
+            SunCoords c = new SunCoords().setCoordinates(d);
+            double H = sidereadlTime(d, lw) - c.righAscension;
+
+            SunPosition position = new SunPosition(azimuth(H,phi,c.declination), altitude(H,phi,c.declination));
+            return position;
+        }
     }
 }
