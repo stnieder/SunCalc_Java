@@ -1,3 +1,4 @@
+import java.sql.Date;
 import java.time.LocalDate;
 
 /*
@@ -9,10 +10,15 @@ import java.time.LocalDate;
 class SunCalc {
 
     public static void main(String[] args) {
+        //To Julian
+        System.out.println("---------- To JDN -------------");
         LocalDate date = LocalDate.of(2001, 3, 1);
-
         System.out.println(toJulian(date));
 
+
+        System.out.println("---------- From JDN -------------");
+        int jdn = 2451970;
+        System.out.println(jdn + " referenziert sich auf das Datum: " + fromJulian(jdn));
     }
 
     public double PI  = Math.PI,
@@ -22,7 +28,7 @@ class SunCalc {
 
 
     //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_1
-    public static int toJulian(LocalDate date) {
+    public static long toJulian(LocalDate date) {
         int year = date.getYear(),
             month = date.getMonthValue(),
             day = date.getDayOfMonth();
@@ -37,12 +43,28 @@ class SunCalc {
 
         System.out.println("c: " + c + "; x4: " + x4 + "; x3: " + x3 + "; x2: " + x2 + "; x1: " + x1);
         
-        return (int) Math.round(((146097 * x3) / 4) + ((36525 * x2) / 100) + ((153 * x1 + 2) / 5) + day + 1721119);
+        return (long) Math.round(((146097 * x3) / 4) + ((36525 * x2) / 100) + ((153 * x1 + 2) / 5) + day + 1721119);
     }
 
-    /*public LocalDate fromJulian(int jdn) { //jdn = julian day number
+    public static LocalDate fromJulian(long jdn) { //jdn = julian day number
+        long k3 = 4 * (jdn - 1721120) + 3;
+        int x3 = Math.round(k3 / 146097);
 
-    }*/
+        long k2 = 100 * ((k3 % 146097) / 4) + 99;
+        int x2 = (int) k2 / 36525;
+
+        long k1 = 5 * ((k2 % 36525) / 100) + 2;
+        int x1 = (int) k1 / 153;
+
+        int c0 = (x1 + 2) / 12;
+
+        int year = 100 * x3 + x2 + c0;
+        int month = x1 - 12 * c0 + 3;
+        int day = (int) ((k1 % 153) / 5) + 1;
+
+        LocalDate date = LocalDate.of(year, month, day);
+        return date;
+    }
 
 }
 
