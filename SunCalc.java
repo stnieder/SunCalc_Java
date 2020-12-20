@@ -1,5 +1,7 @@
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 
 /*
  (c) 2011-2015, Vladimir Agafonkin
@@ -64,11 +66,11 @@ class SunCalc {
     double e = rad * 23.4397; //Schieflage der Erde
 
     
-    public double rightAscension(int l, int b) {
+    public double rightAscension(double l, int b) {
         return Math.atan2( Math.sin(l) * Math.cos(e) - Math.tan(b) * Math.sin(e), Math.cos(l));
     }
 
-    public double declination(int l, int b) {
+    public double declination(double l, int b) {
         return Math.asin(Math.sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l));
     }
 
@@ -93,4 +95,28 @@ class SunCalc {
         return 0.0002967 / Math.tan(h + 0.00312536 / (h + 0.08901179));
     }
 
+
+
+    // General sun Calculations
+    public double solarMeanAnomaly(int d) {
+        return rad * (357.5291 + 0.98560028 * d); 
+    }
+
+    public double eclipticLongitude(double M) {
+        double C = rad * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M)), // equation of center
+        P = rad * 102.9372; // perihelion of the Earth
+
+        return M + C + P + PI;
+    }
+
+    public HashMap<String,Double> sunCoords(int d) {
+        double M = solarMeanAnomaly(d),
+            L = eclipticLongitude(M);
+
+        HashMap<String, Double> map = new HashMap<String, Double>();
+        map.put("dec", declination(L, 0));
+        map.put("ra", rightAscension(L, 0));
+
+        return map;
+    }
 }
