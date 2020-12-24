@@ -4,6 +4,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import jdk.vm.ci.meta.Local;
+
 /*
  (c) 2011-2015, Vladimir Agafonkin
  SunCalc is a JavaScript library for calculating sun/moon position and light phases.
@@ -110,49 +112,30 @@ class SunCalc {
         return M + C + P + PI;
     }
 
+    public HashMap<String, Double> getSunCoordinates(double d) {
+        double M = solarMeanAnomaly(d),
+               L = eclipticLongitude(M);
 
-    public class SunCoords {
-        double declination;
-        double righAscension;
+        HashMap<String, Double> map = new HashMap<String, Double>();
+        map.put("dec", declination(L, 0));
+        map.put("ra", rightAscension(L, 0));
 
-        SunCoords(){}
-        SunCoords(double dec, double ra) {
-            this.declination = dec;
-            this.righAscension = ra;
-        }
-
-        public SunCoords setCoordinates(double d) {
-            double M = solarMeanAnomaly(d),
-                L = eclipticLongitude(M);
-    
-            SunCoords coords = new SunCoords(L, 0);
-    
-            return coords;
-        }
+        return map;
     }
 
-
-    public class SunPosition {
-        double azimuth;
-        double altitude;
-
-        SunPosition(){}
-        SunPosition(double azimuth, double altitude){
-            this.azimuth = azimuth;
-            this.altitude = altitude;
-        }
-
-        public SunPosition getPosition(LocalDate date, double lat, double lng) {
-            double  lw  = rad * -lng,
+    public HashMap<String,Double> getSunPosition(LocalDate date, double lat, double lng) {
+        double  lw  = rad * -lng,
                     phi = rad * lat,
                     d   = toDays(date);
-    
-            SunCoords c = new SunCoords().setCoordinates(d);
-            double H = sidereadlTime(d, lw) - c.righAscension;
 
-            SunPosition position = new SunPosition(azimuth(H,phi,c.declination), altitude(H,phi,c.declination));
-            return position;
-        }
+        HashMap<String,Double> sunCoords = getSunCoordinates(d);
+        double H = sidereadlTime(d, lw) - sunCoords.get("ra");
+
+        HashMap<String,Double> map = new HashMap<String,Double>();
+        map.put("azimuth", azimuth(H, phi, sunCoords.get("dec")));
+        map.put("altitude", altitude(H, phi, sunCoords.get("dec")));
+
+        return map;
     }
 
     public class SunTimes{
@@ -289,7 +272,7 @@ class SunCalc {
     }
 
 
-    public Map<String, Double> getMoonCoordinates(double d){
+    public HashMap<String, Double> getMoonCoordinates(double d){
         double  L = rad * (218.316 + 13.176396 * d), // ecliptic longitude
                 M = rad * (134.963 + 13.064993 * d), // mean anomaly
                 F = rad * (93.272 + 13.229350 * d),  // mean distance
@@ -326,6 +309,28 @@ class SunCalc {
         map.put("altitude", h);
         map.put("distance", moonCoords.get("dist"));
         map.put("parallacticAngle", pa);
+
+        return map;
+    }
+
+    public Map<String, Double> getMoonIllumination(LocalDate date) {
+        double  d   = toDays(date);
+        
+        HashMap<String,Double>  s = getSunCoordinates(d),
+                                m = getMoonCoordinates(d);
+
+        int sdist = 149598000; //distance from earth to sun in km
+
+        double phi = Math.acos(Math.sin(s.get("dec")) * Math.sin(m.get("dec")) + Math.cos(s.get("dec")) * Math.cos(m.get("dec")) * Math.cos(s.get("ra") - m.get("ra"))),
+               inc = Math.atan2(sdist * Math.sin(phi), m.get("dist") - sdist * Math.cos(phi)),
+               angle = Math.atan2(Math.cos(s.get("dec")) * Math.sin(s.get("ra") - m.get("ra")), Math.sin(s.get("dec")) * Math.cos(m.get("dec")) -
+               Math.cos(s.get("dec")) * Math.sin(m.get("dec")) * Math.cos(s.get("ra") - m.get("ra")));
+
+        HashMap<String,Double> map = new HashMap<String, Double>();
+        map.put("fraction", (1 + Math.cos(inc)) / 2);
+        map.put("phase", 0.5 + 0.5 * inc * (angle < 0 ? -1 : 1) / Math.PI);
+        map.put("angle", angle);
+
 
         return map;
     }
