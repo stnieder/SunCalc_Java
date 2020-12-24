@@ -87,7 +87,7 @@ class SunCalc {
         return rad * (280.16 + 360.9856235 * d) - lw;
     }
 
-    private double astroRefraction(int h) {
+    private double astroRefraction(double h) {
         if (h < 0) // the following formula works for positive altitudes only.
         h = 0; // if h = -0.08901179 a div/0 would occur.
 
@@ -288,8 +288,8 @@ class SunCalc {
         }
     }
 
-    public class MoonCords {
-        double d;
+
+    public Map<String, Double> getMoonCoordinates(double d){
         double  L = rad * (218.316 + 13.176396 * d), // ecliptic longitude
                 M = rad * (134.963 + 13.064993 * d), // mean anomaly
                 F = rad * (93.272 + 13.229350 * d),  // mean distance
@@ -297,16 +297,36 @@ class SunCalc {
                 l  = L + rad * 6.289 * Math.sin(M), // longitude
                 b  = rad * 5.128 * Math.sin(F),     // latitude
                 dt = 385001 - 20905 * Math.cos(M);  // distance to the moon in km
+        
+        HashMap<String,Double> map = new HashMap<String, Double>();
+        map.put("ra", rightAscension(l, b));
+        map.put("dec", declination(l, b));
+        map.put("dist", dt);
 
-        public Map<String, Double> getCoordinates(double d){
-            this.d = d;
-            
-            HashMap<String,Double> map = new HashMap<String, Double>();
-            map.put("ra", rightAscension(l, b));
-            map.put("dec", declination(l, b));
-            map.put("dist", dt);
+        return map;
+    }
 
-            return map;
-        }
+    public Map<String, Double> getMoonPosition(LocalDate date, double lat, double lng) {
+
+        double  lw  = rad * -lng,
+                phi = rad * lat,
+                d   = toDays(date);
+
+        Map<String, Double> moonCoords = getMoonCoordinates(d);
+        
+        double  H   = sidereadlTime(d, lw) - moonCoords.get("ra"),
+                h   = altitude(H, phi, moonCoords.get("dec")),
+                pa  = Math.atan2(Math.sin(H), Math.tan(phi) * Math.cos(moonCoords.get("dec")) - Math.sin(moonCoords.get("dec")) * Math.cos(H));
+
+
+        h = h + astroRefraction(h);
+        
+        HashMap<String, Double> map = new HashMap<String,Double>();
+        map.put("azimuth", azimuth(H, phi, moonCoords.get("dec")));
+        map.put("altitude", h);
+        map.put("distance", moonCoords.get("dist"));
+        map.put("parallacticAngle", pa);
+
+        return map;
     }
 }
