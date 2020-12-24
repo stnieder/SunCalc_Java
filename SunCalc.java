@@ -1,11 +1,7 @@
-import java.lang.reflect.Array;
-import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 /*
@@ -71,11 +67,11 @@ class SunCalc {
     double e = rad * 23.4397; //Schieflage der Erde
 
     
-    private double rightAscension(double l, int b) {
+    private double rightAscension(double l, double b) {
         return Math.atan2( Math.sin(l) * Math.cos(e) - Math.tan(b) * Math.sin(e), Math.cos(l));
     }
 
-    private double declination(double l, int b) {
+    private double declination(double l, double b) {
         return Math.asin(Math.sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l));
     }
 
@@ -159,12 +155,12 @@ class SunCalc {
         }
     }
 
-    public class Times{
+    public class SunTimes{
 
         ArrayList<Object[]> times;
         boolean initialized = false;
 
-        public Times() {
+        public SunTimes() {
             initializeTime();
         }
 
@@ -252,7 +248,7 @@ class SunCalc {
             return solarTransit(a, M, L);
         }
 
-        public ArrayList<Object[]> getTimes(Times times, LocalDate date, double lat, double lng, double height) {
+        public HashMap<String, Object> getTimes(SunTimes times, LocalDate date, double lat, double lng, double height) {
             double  lw  = rad * -lng,
                     phi = rad * lat,
                     
@@ -273,16 +269,9 @@ class SunCalc {
             Object[] time;
 
 
-            ArrayList<Object[]> results = new ArrayList<Object[]>();
-            Object[] firstObject = {
-                "solarNoon", fromJulian(Jnoon)
-            };
-            Object[] secondObject = {
-                "nadir", fromJulian(Jnoon - 0-5)
-            };
-
-            results.add(firstObject);
-            results.add(secondObject);
+            HashMap<String, Object> results = new HashMap<String, Object>();
+            results.put("solarNoon", fromJulian(Jnoon));
+            results.put("nadir", fromJulian(Jnoon - 0.5));
 
             for (int i = 0, len = times.countTimes(); i < len; i++) {
                 time = times.getTimes().get(i);
@@ -291,20 +280,33 @@ class SunCalc {
                 Jset = getSetJ(h0, lw, phi, dec, n, M, L);
                 Jrise = Jnoon - (Jset - Jnoon);
 
-                Object[] riseObject = {
-                    time[1], fromJulian(Jrise)
-                };
-                Object[] setObject = {
-                    time[2], fromJulian(Jset)
-                };
-
-                results.add(setObject);
-                results.add(riseObject);
+                results.put(time[1].toString(), fromJulian(Jrise));
+                results.put(time[2].toString(), fromJulian(Jset));
             }
 
             return results;
-
         }
+    }
 
+    public class MoonCords {
+        double d;
+        double  L = rad * (218.316 + 13.176396 * d), // ecliptic longitude
+                M = rad * (134.963 + 13.064993 * d), // mean anomaly
+                F = rad * (93.272 + 13.229350 * d),  // mean distance
+
+                l  = L + rad * 6.289 * Math.sin(M), // longitude
+                b  = rad * 5.128 * Math.sin(F),     // latitude
+                dt = 385001 - 20905 * Math.cos(M);  // distance to the moon in km
+
+        public Map<String, Double> getCoordinates(double d){
+            this.d = d;
+            
+            HashMap<String,Double> map = new HashMap<String, Double>();
+            map.put("ra", rightAscension(l, b));
+            map.put("dec", declination(l, b));
+            map.put("dist", dt);
+
+            return map;
+        }
     }
 }
