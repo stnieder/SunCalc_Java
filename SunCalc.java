@@ -174,11 +174,11 @@ class SunCalc {
         times.add(object);
     }
 
-    public ArrayList<Object[]> getTimes(){
+    public ArrayList<Object[]> getSunTimes(){
         return times;
     }
 
-    public int countTimes() {
+    public int countSunTimes() {
         if(!initialized) {
             Collections.addAll(times, initalTimes);
             initialized = true;
@@ -218,7 +218,7 @@ class SunCalc {
         return solarTransit(a, M, L);
     }
 
-    public HashMap<String, Object> getSunTimes(SunTimes times, LocalDate date, double lat, double lng, double height) {
+    public HashMap<String, Object> getSunTimes(LocalDate date, double lat, double lng, double height) {
         double  lw  = rad * -lng,
                 phi = rad * lat,
                 
@@ -243,8 +243,8 @@ class SunCalc {
         results.put("solarNoon", fromJulian(Jnoon));
         results.put("nadir", fromJulian(Jnoon - 0.5));
 
-        for (int i = 0, len = times.countTimes(); i < len; i++) {
-            time = times.getTimes().get(i);
+        for (int i = 0, len = countSunTimes(); i < len; i++) {
+            time = getSunTimes().get(i);
             h0 = ((double) time[0] + dh) * rad;
 
             Jset = getSetJ(h0, lw, phi, dec, n, M, L);
