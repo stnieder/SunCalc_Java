@@ -1,10 +1,13 @@
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TimeZone;
 
 /*
  (c) 2011-2015, Vladimir Agafonkin
@@ -289,11 +292,11 @@ class SunCalc {
         return map;
     }
 
-    public Map<String, Double> getMoonPosition(LocalDate date, double lat, double lng) {
+    public Map<String, Double> getMoonPosition(LocalDateTime date, double lat, double lng) {
 
         double  lw  = rad * -lng,
                 phi = rad * lat,
-                d   = toDays(date);
+                d   = toDays(LocalDate.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth()));
 
         Map<String, Double> moonCoords = getMoonCoordinates(d);
         
@@ -335,13 +338,87 @@ class SunCalc {
         return map;
     }
 
-    public static LocalDateTime hoursLater(LocalDateTime date, int hours) {
+    public static LocalDateTime hoursLater(LocalDate date, double hours) {
         return LocalDateTime.of(
             date.getYear(), 
             date.getMonth(), 
             date.getDayOfMonth(), 
-            date.getHour() + hours, 
-            date.getMinute()
+            (int) hours, 
+            0
         );
+    }
+
+    public HashMap<String,Object> getMoonTimes(LocalDate date, double lat, double lng, boolean inUTC) {
+        LocalDate localDate = date;
+        LocalDateTime localDateTime;
+
+        if (inUTC) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+            localDate.atTime(0,0,0);
+            localDateTime = LocalDateTime.parse(sdf.format(localDate));
+
+        } else {
+            localDateTime = LocalDateTime.of(
+                localDate.getYear(),
+                localDate.getMonthValue(),
+                localDate.getDayOfMonth(),
+                0,
+                0,
+                0
+            );
+        }
+
+        double  hc  = 0.133 * rad,
+                h0  = getMoonPosition(localDateTime, lat, lng).get("altitude") - hc,
+                h1, h2, rise = Double.NaN, set = Double.NaN, a, b, xe, ye, d, roots, x1 = 0, x2 = 0, dx;
+
+        for (int i = 0; i <= 24; i++) {
+            h1 = getMoonPosition(hoursLater(localDate, i), lat, lng).get("altitude") - hc;
+            h2 = getMoonPosition(hoursLater(localDate, i + 1), lat, lng).get("altitude") - hc;
+
+            a = (h0 + h2) / 2 - h1;
+            b = (h2 - h0) / 2;
+            xe = -b / (2 * a);
+            ye = (a * xe + b) * xe + h1;
+            d = b * b - 4 * a * h1;
+            roots = 0;
+
+            if (d >= 0) {
+                dx = Math.sqrt(d) / (Math.abs(a) * 2);
+                x1 = xe - dx;
+                x2 = xe + dx;
+                if (Math.abs(x1) <= 1) roots++;
+                if (Math.abs(x2) <= 1) roots++;
+                if (x1 < -1) x1 = x2;
+            }
+
+            if (roots == 1) {
+                if (h0 < 0) rise = i + x1;
+                else set = i + x1;
+
+            } else if (roots == 2) {
+                rise = i + (ye < 0 ? x2 : x1);
+                set = i + (ye < 0 ? x1 : x2);
+            }
+
+            if (!Double.isNaN(rise) && !Double.isNaN(set)) break;
+
+            h0 = h2;
+        }
+
+        HashMap<String, Object> result = new HashMap<String, Object>();
+
+        if (!Double.isNaN(rise)) 
+            result.put("rise", hoursLater(localDateTime.toLocalDate(), rise));
+
+        if (!Double.isNaN(set)) 
+            result.put("set", hoursLater(localDateTime.toLocalDate(), set));
+
+        if (Double.isNaN(rise) && Double.isNaN(set))
+            result.put(ye > 0 ? "alwaysUp" : "alwaysDown", true);
+
+        return result;
     }
 }
