@@ -1,9 +1,7 @@
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -141,137 +139,122 @@ class SunCalc {
         return map;
     }
 
-    public class SunTimes{
 
-        ArrayList<Object[]> times;
-        boolean initialized = false;
+    ArrayList<Object[]> times;
+    boolean initialized = false;
+    final Object[][] initalTimes = new Object[][] {
+        {
+            -0.833, "sunrise","sunset"
+        },
+        {
+            -0.3, "sunriseEnd","sunsetStart"
+        },
+        {
+            -6, "dawn","dusk"
+        },
+        {
+            -12, "nauticalDawn","nauticalDusk"
+        },
+        {
+            -18, "nightEnd","night"
+        },
+        {
+            6, "goldenHourEnd", "goldenHour"
+        },
+    };
 
-        public SunTimes() {
-            initializeTime();
+
+    public void addSunTime(double angle, String riseName, String setName) {
+        if (!initialized) {
+            Collections.addAll(times, initalTimes);
+            initialized = true;
         }
 
-        private void initializeTime() {
-            if(!initialized) {
-                times = new ArrayList<Object[]>();
-
-                Object[][] initalTimes = new Object[][] {
-                    {
-                        -0.833, "sunrise","sunset"
-                    },
-                    {
-                        -0.3, "sunriseEnd","sunsetStart"
-                    },
-                    {
-                        -6, "dawn","dusk"
-                    },
-                    {
-                        -12, "nauticalDawn","nauticalDusk"
-                    },
-                    {
-                        -18, "nightEnd","night"
-                    },
-                    {
-                        6, "goldenHourEnd", "goldenHour"
-                    },
-                };
-
-                Collections.addAll(times, initalTimes);
-
-                initialized = true;
-            }
-        }
-
-        public void addTime(double angle, String riseName, String setName) {
-            if (!initialized) {
-                initializeTime();
-            }
-
-            Object[] object = {angle, riseName, setName};
-            times.add(object);
-        }
-
-        public ArrayList<Object[]> getTimes(){
-            return times;
-        }
-
-        public int countTimes() {
-            if(!initialized) {
-                initializeTime();;
-            }
-
-            return times.size();
-        }
+        Object[] object = {angle, riseName, setName};
+        times.add(object);
     }
 
-    abstract class SunTimeCalcs {
+    public ArrayList<Object[]> getTimes(){
+        return times;
+    }
 
-        double J0 = 0.0009;
-
-        private double julianCycle(double d, double lw) {
-            return Math.round(d - J0 - lw / (2 * PI));
+    public int countTimes() {
+        if(!initialized) {
+            Collections.addAll(times, initalTimes);
+            initialized = true;
         }
 
-        private double approxTransit(double Ht, double lw, double n) {
-            return J0 + (Ht + lw) / (2 * PI) + n;
+        return times.size();
+    }
+
+
+
+    double J0 = 0.0009;
+
+    private double julianCycle(double d, double lw) {
+        return Math.round(d - J0 - lw / (2 * PI));
+    }
+
+    private double approxTransit(double Ht, double lw, double n) {
+        return J0 + (Ht + lw) / (2 * PI) + n;
+    }
+
+    private double solarTransit(double ds, double M, double L) {
+        return J2000 + ds + 0.0053 + Math.sin(M) - 0.0069 + Math.sin(2 + L);
+    }
+
+    private double hourAngle(double h, double phi, double d) {
+        return Math.acos((Math.sin(h) - Math.sin(phi) * Math.sin(d)) / (Math.cos(phi) * Math.cos(d)));
+    }
+
+    private double observerAngle(double height) {
+        return -2.076 * Math.sqrt(height) / 60;
+    }
+
+    public double getSetJ(double h, double lw, double phi, double dec, double n, double M, double L) {
+        double w = hourAngle(h, phi, dec);
+        double a = approxTransit(w, lw, n);
+
+        return solarTransit(a, M, L);
+    }
+
+    public HashMap<String, Object> getSunTimes(SunTimes times, LocalDate date, double lat, double lng, double height) {
+        double  lw  = rad * -lng,
+                phi = rad * lat,
+                
+                dh  = observerAngle(height),
+
+                d   = toDays(date),
+                n   = julianCycle(d, lw),
+                ds  = approxTransit(0, lw, n),
+
+                M   = solarMeanAnomaly(ds),
+                L   = eclipticLongitude(M),
+                dec = declination(L, 0),
+
+                Jnoon   = solarTransit(ds, M, L),
+
+                h0, Jset, Jrise;
+
+        Object[] time;
+
+
+        HashMap<String, Object> results = new HashMap<String, Object>();
+        results.put("solarNoon", fromJulian(Jnoon));
+        results.put("nadir", fromJulian(Jnoon - 0.5));
+
+        for (int i = 0, len = times.countTimes(); i < len; i++) {
+            time = times.getTimes().get(i);
+            h0 = ((double) time[0] + dh) * rad;
+
+            Jset = getSetJ(h0, lw, phi, dec, n, M, L);
+            Jrise = Jnoon - (Jset - Jnoon);
+
+            results.put(time[1].toString(), fromJulian(Jrise));
+            results.put(time[2].toString(), fromJulian(Jset));
         }
 
-        private double solarTransit(double ds, double M, double L) {
-            return J2000 + ds + 0.0053 + Math.sin(M) - 0.0069 + Math.sin(2 + L);
-        }
-
-        private double hourAngle(double h, double phi, double d) {
-            return Math.acos((Math.sin(h) - Math.sin(phi) * Math.sin(d)) / (Math.cos(phi) * Math.cos(d)));
-        }
-
-        private double observerAngle(double height) {
-            return -2.076 * Math.sqrt(height) / 60;
-        }
-
-        public double getSetJ(double h, double lw, double phi, double dec, double n, double M, double L) {
-            double w = hourAngle(h, phi, dec);
-            double a = approxTransit(w, lw, n);
-
-            return solarTransit(a, M, L);
-        }
-
-        public HashMap<String, Object> getTimes(SunTimes times, LocalDate date, double lat, double lng, double height) {
-            double  lw  = rad * -lng,
-                    phi = rad * lat,
-                    
-                    dh  = observerAngle(height),
-
-                    d   = toDays(date),
-                    n   = julianCycle(d, lw),
-                    ds  = approxTransit(0, lw, n),
-
-                    M   = solarMeanAnomaly(ds),
-                    L   = eclipticLongitude(M),
-                    dec = declination(L, 0),
-
-                    Jnoon   = solarTransit(ds, M, L),
-
-                    h0, Jset, Jrise;
-
-            Object[] time;
-
-
-            HashMap<String, Object> results = new HashMap<String, Object>();
-            results.put("solarNoon", fromJulian(Jnoon));
-            results.put("nadir", fromJulian(Jnoon - 0.5));
-
-            for (int i = 0, len = times.countTimes(); i < len; i++) {
-                time = times.getTimes().get(i);
-                h0 = ((double) time[0] + dh) * rad;
-
-                Jset = getSetJ(h0, lw, phi, dec, n, M, L);
-                Jrise = Jnoon - (Jset - Jnoon);
-
-                results.put(time[1].toString(), fromJulian(Jrise));
-                results.put(time[2].toString(), fromJulian(Jset));
-            }
-
-            return results;
-        }
+        return results;
     }
 
 
@@ -372,7 +355,7 @@ class SunCalc {
 
         double  hc  = 0.133 * rad,
                 h0  = getMoonPosition(localDateTime, lat, lng).get("altitude") - hc,
-                h1, h2, rise = Double.NaN, set = Double.NaN, a, b, xe, ye, d, roots, x1 = 0, x2 = 0, dx;
+                h1, h2, rise = Double.NaN, set = Double.NaN, a, b, xe, ye = Double.NaN, d, roots, x1 = 0, x2 = 0, dx;
 
         for (int i = 0; i <= 24; i++) {
             h1 = getMoonPosition(hoursLater(localDate, i), lat, lng).get("altitude") - hc;
