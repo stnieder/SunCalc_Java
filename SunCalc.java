@@ -1,11 +1,10 @@
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
-import jdk.vm.ci.meta.Local;
 
 /*
  (c) 2011-2015, Vladimir Agafonkin
@@ -336,11 +335,11 @@ class SunCalc {
         return map;
     }
 
-    public LocalDateTime hoursLater(LocalDateTime date, int hours) {
+    public static LocalDateTime hoursLater(LocalDateTime date, int hours) {
         return LocalDateTime.of(
             date.getYear(), 
             date.getMonth(), 
-            date.getYear(), 
+            date.getDayOfMonth(), 
             date.getHour() + hours, 
             date.getMinute()
         );
