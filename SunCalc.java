@@ -1,6 +1,9 @@
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.JulianFields;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -22,26 +25,22 @@ class SunCalc {
 
 
     //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_1
-    private long toJulian(LocalDate date) {
+    private long toJulian(LocalDateTime date) {
         int year = date.getYear(),
             month = date.getMonthValue(),
             day = date.getDayOfMonth();
-
-        System.out.println("Year: " + year + "; month: " + month + "; day: "+ day);
 
         double c  = Math.floor((month - 3) / 12.0);
         double x4 = year + c;
         int x3 = (int) x4 / 100;
         int x2 = (int) x4 % 100;
         double x1 = month - 12 * c - 3;
-
-        System.out.println("c: " + c + "; x4: " + x4 + "; x3: " + x3 + "; x2: " + x2 + "; x1: " + x1);
         
         return (long) Math.round(((146097 * x3) / 4) + ((36525 * x2) / 100) + ((153 * x1 + 2) / 5) + day + 1721119);
     }
 
     //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_2
-    private LocalDate fromJulian(double jdn) { //jdn = julian day number
+    /*public LocalDateTime fromJulian(double jdn) { //jdn = julian day number
         double k3 = 4 * (jdn - 1721120) + 3;
         double x3 = Math.round(k3 / 146097);
 
@@ -57,12 +56,21 @@ class SunCalc {
         int month = x1 - 12 * c0 + 3;
         int day = (int) ((k1 % 153) / 5) + 1;
 
-        LocalDate date = LocalDate.of((int) year, month, day);
-        return date;
+        YearMonth yearMonthObject = YearMonth.of((int) year, month);
+        int daysInMonth = yearMonthObject.lengthOfMonth();
+        day = daysInMonth < day ? daysInMonth : day;
+        
+        return LocalDateTime.of((int) year, month, day, 0,0);        
+    }*/
+
+    public String fromJulian(double jdn) {
+        LocalDate date = LocalDate.MIN.with(JulianFields.JULIAN_DAY, jdn);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMMM yyyy");
+        return date.format(formatter);
     }
 
     private long toDays(LocalDate date) {
-        return toJulian(date) - J2000;
+        return toJulian(LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0)) - J2000;
     }
 
 
@@ -140,7 +148,7 @@ class SunCalc {
     }
 
 
-    ArrayList<Object[]> times;
+    ArrayList<Object[]> times = new ArrayList<Object[]>();
     boolean initialized = false;
     final Object[][] initalTimes = new Object[][] {
         {
@@ -150,16 +158,16 @@ class SunCalc {
             -0.3, "sunriseEnd","sunsetStart"
         },
         {
-            -6, "dawn","dusk"
+            -6.0, "dawn","dusk"
         },
         {
-            -12, "nauticalDawn","nauticalDusk"
+            -12.0, "nauticalDawn","nauticalDusk"
         },
         {
-            -18, "nightEnd","night"
+            -18.0, "nightEnd","night"
         },
         {
-            6, "goldenHourEnd", "goldenHour"
+            6.0, "goldenHourEnd", "goldenHour"
         },
     };
 
@@ -245,7 +253,7 @@ class SunCalc {
 
         for (int i = 0, len = countSunTimes(); i < len; i++) {
             time = getSunTimes().get(i);
-            h0 = ((double) time[0] + dh) * rad;
+            h0 = (Double.parseDouble(time[0].toString()) + dh) * rad;
 
             Jset = getSetJ(h0, lw, phi, dec, n, M, L);
             Jrise = Jnoon - (Jset - Jnoon);
