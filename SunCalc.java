@@ -1,8 +1,11 @@
+import java.sql.Time;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.JulianFields;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,23 +23,28 @@ class SunCalc {
 
     private double PI  = Math.PI,
                   rad = PI / 180;
+    
+    double dayMs = 1000 * 60 * 60 * 24,
+        J1970 = 2440587.5,
+        J2000 = 2451545;
 
-    private int J2000 = 2451545;
+    int BCE = 4713; //at 4713 BCE started the day calculation for the julian date
 
 
     //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_1
-    private long toJulian(LocalDateTime date) {
-        int year = date.getYear(),
-            month = date.getMonthValue(),
-            day = date.getDayOfMonth();
+    public double toJulian(LocalDateTime date) {
+        double jdn = JulianFields.JULIAN_DAY.getFrom(date);
+        double passed_seconds = 0;
+        if (date.getHour() > 12) {
+            passed_seconds = (date.getSecond() + date.getMinute() * 60 + (date.getHour() - 12) * 3600);
+        } else {
+            passed_seconds = (date.getSecond() + date.getMinute() * 60 + date.getHour() * 3600);
+        }
+        passed_seconds /= 86400;
 
-        double c  = Math.floor((month - 3) / 12.0);
-        double x4 = year + c;
-        int x3 = (int) x4 / 100;
-        int x2 = (int) x4 % 100;
-        double x1 = month - 12 * c - 3;
-        
-        return (long) Math.round(((146097 * x3) / 4) + ((36525 * x2) / 100) + ((153 * x1 + 2) / 5) + day + 1721119);
+        jdn += passed_seconds;
+
+        return jdn;
     }
 
     //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_2
@@ -64,12 +72,14 @@ class SunCalc {
     }*/
 
     public String fromJulian(double jdn) {
-        LocalDate date = LocalDate.MIN.with(JulianFields.JULIAN_DAY, jdn);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMMM yyyy");
-        return date.format(formatter);
+        
+        /*jdn = (jdn + 0.5 - J1970) * dayMs;
+        LocalDateTime dateTime = LocalDateTime.MIN.with(JulianFields.JULIAN_DAY, (long) jdn);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMMM yyyy HH:mm:ss");
+        return dateTime.format(formatter);*/
     }
 
-    private long toDays(LocalDate date) {
+    private double toDays(LocalDate date) {
         return toJulian(LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0)) - J2000;
     }
 
