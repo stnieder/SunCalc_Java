@@ -1,13 +1,18 @@
-import java.sql.Time;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.JulianFields;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,26 +30,21 @@ class SunCalc {
                   rad = PI / 180;
     
     double dayMs = 1000 * 60 * 60 * 24,
-        J1970 = 2440587.5,
+        J1970 = 2440588,
         J2000 = 2451545;
 
     int BCE = 4713; //at 4713 BCE started the day calculation for the julian date
 
 
-    //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_1
+    //Based on https://sciencing.com/calculate-julian-date-6465290.html
     public double toJulian(LocalDateTime date) {
-        double jdn = JulianFields.JULIAN_DAY.getFrom(date);
-        double passed_seconds = 0;
-        if (date.getHour() > 12) {
-            passed_seconds = (date.getSecond() + date.getMinute() * 60 + (date.getHour() - 12) * 3600);
-        } else {
-            passed_seconds = (date.getSecond() + date.getMinute() * 60 + date.getHour() * 3600);
-        }
-        passed_seconds /= 86400;
+        ZonedDateTime zdt = date.atZone(ZoneId.of("Europe/Vienna"));
+        double result = zdt.toInstant().toEpochMilli(); //milliseconds since epoch
+        result = result / dayMs - 0.5 + J1970;
 
-        jdn += passed_seconds;
+        System.out.println("toJulian.result: " + result);
 
-        return jdn;
+        return result;
     }
 
     //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_2
@@ -72,15 +72,63 @@ class SunCalc {
     }*/
 
     public String fromJulian(double jdn) {
+
+        // You have to use BigDecimal to get the biggest number possible, that
+        // is too big for double
+
+        double big_jdn = (jdn + 0.5 - J1970) * dayMs;
+        System.out.println("fromJulian.big_jdn: " + big_jdn);
+        double decimal = big_jdn % 1;
+
+        double k3 = 4 * (big_jdn - 1721120) + 3;
+        double x3 = Math.round(k3 / 146097);
+
+        double k2 = 100 * ((k3 % 146097) / 4) + 99;
+        int x2 = (int) k2 / 36525;
+
+        double k1 = 5 * ((k2 % 36525) / 100) + 2;
+        int x1 = (int) k1 / 153;
+
+        int c0 = (x1 + 2) / 12;
+
+        double year = 100 * x3 + x2 + c0;
+        int month = x1 - 12 * c0 + 3;
+        int day = (int) ((k1 % 153) / 5) + 1;
+
         
-        /*jdn = (jdn + 0.5 - J1970) * dayMs;
-        LocalDateTime dateTime = LocalDateTime.MIN.with(JulianFields.JULIAN_DAY, (long) jdn);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMMM yyyy HH:mm:ss");
-        return dateTime.format(formatter);*/
+        double dhour = decimal * 24;
+        int hour = (int) Math.round(dhour);
+
+        decimal = dhour % 1;
+
+        double dminute = decimal * 60;
+        int minute = (int) Math.round(dminute);
+
+        decimal = dminute % 1;
+
+        double dsecond = decimal * 60;
+        int second = (int) Math.round(dsecond);
+
+        LocalDateTime ldt = LocalDateTime.of(
+            (int) Math.round(year),
+            month,
+            day,
+            hour,
+            minute,
+            second
+        );
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+        ZonedDateTime zdt = ZonedDateTime.of(ldt, ZoneId.of("UTC"));
+        
+        String result = dtf.format(zdt);
+
+        System.out.println("fromJulian.result: " + result);
+
+        return result;
     }
 
-    private double toDays(LocalDate date) {
-        return toJulian(LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0)) - J2000;
+    public double toDays(LocalDateTime date) {
+        return toJulian(date) - J2000;
     }
 
 
@@ -121,7 +169,7 @@ class SunCalc {
 
     // General sun Calculations
     private double solarMeanAnomaly(double d) {
-        return rad * (357.5291 + 0.98560028 * d); 
+        return rad * (357.5291 + 0.98560028 * d);
     }
 
     private double eclipticLongitude(double M) {
@@ -142,7 +190,7 @@ class SunCalc {
         return map;
     }
 
-    public HashMap<String,Double> getSunPosition(LocalDate date, double lat, double lng) {
+    public HashMap<String,Double> getSunPosition(LocalDateTime date, double lat, double lng) {
         double  lw  = rad * -lng,
                     phi = rad * lat,
                     d   = toDays(date);
@@ -192,7 +240,7 @@ class SunCalc {
         times.add(object);
     }
 
-    public ArrayList<Object[]> getSunTimes(){
+    public ArrayList<Object[]> getAllSunTimes(){
         return times;
     }
 
@@ -213,12 +261,12 @@ class SunCalc {
         return Math.round(d - J0 - lw / (2 * PI));
     }
 
-    private double approxTransit(double Ht, double lw, double n) {
+    private double approxTransitJ(double Ht, double lw, double n) {
         return J0 + (Ht + lw) / (2 * PI) + n;
     }
 
     private double solarTransit(double ds, double M, double L) {
-        return J2000 + ds + 0.0053 + Math.sin(M) - 0.0069 + Math.sin(2 + L);
+        return J2000 + ds + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
     }
 
     private double hourAngle(double h, double phi, double d) {
@@ -231,20 +279,20 @@ class SunCalc {
 
     public double getSetJ(double h, double lw, double phi, double dec, double n, double M, double L) {
         double w = hourAngle(h, phi, dec);
-        double a = approxTransit(w, lw, n);
+        double a = approxTransitJ(w, lw, n);
 
         return solarTransit(a, M, L);
     }
 
-    public HashMap<String, Object> getSunTimes(LocalDate date, double lat, double lng, double height) {
-        double  lw  = rad * -lng,
+    public HashMap<String, Object> getSunTimes(LocalDateTime date, double lat, double lng, double height) {
+        double  lw  = rad * (lng * -1),
                 phi = rad * lat,
                 
-                dh  = observerAngle(height),
+                dh  = observerAngle(height);
 
-                d   = toDays(date),
-                n   = julianCycle(d, lw),
-                ds  = approxTransit(0, lw, n),
+        double  d   = toDays(date);
+        double  n   = julianCycle(d, lw),
+                ds  = approxTransitJ(0, lw, n),
 
                 M   = solarMeanAnomaly(ds),
                 L   = eclipticLongitude(M),
@@ -254,15 +302,16 @@ class SunCalc {
 
                 h0, Jset, Jrise;
 
-        Object[] time;
+        System.out.println("getSunTimes.Jnoon: " + Jnoon);
 
+        Object[] time;
 
         HashMap<String, Object> results = new HashMap<String, Object>();
         results.put("solarNoon", fromJulian(Jnoon));
         results.put("nadir", fromJulian(Jnoon - 0.5));
 
         for (int i = 0, len = countSunTimes(); i < len; i++) {
-            time = getSunTimes().get(i);
+            time = getAllSunTimes().get(i);
             h0 = (Double.parseDouble(time[0].toString()) + dh) * rad;
 
             Jset = getSetJ(h0, lw, phi, dec, n, M, L);
@@ -297,7 +346,7 @@ class SunCalc {
 
         double  lw  = rad * -lng,
                 phi = rad * lat,
-                d   = toDays(LocalDate.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth()));
+                d   = toDays(LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), date.getHour(), date.getMinute(), date.getSecond()));
 
         Map<String, Double> moonCoords = getMoonCoordinates(d);
         
@@ -317,7 +366,7 @@ class SunCalc {
         return map;
     }
 
-    public Map<String, Double> getMoonIllumination(LocalDate date) {
+    public Map<String, Double> getMoonIllumination(LocalDateTime date) {
         double  d   = toDays(date);
         
         HashMap<String,Double>  s = getSunCoordinates(d),
