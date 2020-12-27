@@ -10,6 +10,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
+import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.JulianFields;
 import java.util.ArrayList;
@@ -39,68 +40,20 @@ class SunCalc {
 
 
     public double toJulian(LocalDateTime date) {
-        ZonedDateTime zdt = date.atZone(ZoneId.of("Europe/Vienna"));
-        double result = zdt.toInstant().toEpochMilli(); //milliseconds since epoch
-        result = result / dayMs - 0.5 + J1970;
+        LocalTime timeOfDay = date.toLocalTime();
+        double result = date.getLong(JulianFields.JULIAN_DAY);
+        result += timeOfDay.get(ChronoField.MILLI_OF_DAY) / dayMs - 0.5;
 
         return result;
     }
 
     public String fromJulian(double jdn) {
-
-        //wrong calculations
-
-        System.out.println("fromJulian.jdn: " + jdn);
-
-        int jalpha,ja,jb,jc,jd,je,year,month,day;
-        double  julian = jdn,
-                decimal= jdn % 1;
-        ja = (int) julian;
-        if (ja>= JGREG) {
-            jalpha = (int) (((ja - 1867216) - 0.25) / 36524.25);
-            ja = ja + 1 + jalpha - jalpha / 4;
-        }
-
-        jb = ja + 1524;
-        jc = (int) (6680.0 + ((jb - 2439870) - 122.1) / 365.25);
-        jd = 365 * jc + jc / 4;
-        je = (int) ((jb - jd) / 30.6001);
-        day = jb - jd - (int) (30.6001 * je);
-        month = je - 1;
-        if (month > 12) month = month - 12;
-        year = jc - 4715;
-        if (month > 2) year--;
-        if (year <= 0) year--;
-
-        double dhour = decimal * 24;
-        int hour = (int) Math.round(dhour);
-
-        decimal = dhour % 1;
-
-        double dminute = decimal * 60;
-        int minute = (int) Math.round(dminute);
-
-        decimal = dminute % 1;
-
-        double dsecond = decimal * 60;
-        int second = (int) Math.round(dsecond);
-
-        LocalDateTime ldt = LocalDateTime.of(
-            year,
-            month,
-            day,
-            hour,
-            minute,
-            second
-        );
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-        ZonedDateTime zdt = ZonedDateTime.of(ldt, ZoneId.of("UTC"));
-
-        return dtf.format(zdt);
-    }
-
-    public double toDays(LocalDateTime date) {
-        return toJulian(date) - J2000;
+        LocalDate date = LocalDate.EPOCH.with(JulianFields.JULIAN_DAY, (long) jdn);
+        LocalDateTime result = date.atStartOfDay()
+                .plusHours(12)
+                .plus((long) ((jdn % 1 * dayMs) + 0.5), ChronoUnit.MILLIS);
+        
+        return result.toString();
     }
 
 
@@ -165,7 +118,7 @@ class SunCalc {
     public HashMap<String,Double> getSunPosition(LocalDateTime date, double lat, double lng) {
         double  lw  = rad * -lng,
                     phi = rad * lat,
-                    d   = toDays(date);
+                    d   = toJulian(date);
 
         HashMap<String,Double> sunCoords = getSunCoordinates(d);
         double H = sidereadlTime(d, lw) - sunCoords.get("ra");
@@ -262,7 +215,7 @@ class SunCalc {
                 
                 dh  = observerAngle(height);
 
-        double  d   = toDays(date);
+        double  d   = toJulian(date);
         double  n   = julianCycle(d, lw),
                 ds  = approxTransitJ(0, lw, n),
 
@@ -318,7 +271,7 @@ class SunCalc {
 
         double  lw  = rad * -lng,
                 phi = rad * lat,
-                d   = toDays(LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), date.getHour(), date.getMinute(), date.getSecond()));
+                d   = toJulian(LocalDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), date.getHour(), date.getMinute(), date.getSecond()));
 
         Map<String, Double> moonCoords = getMoonCoordinates(d);
         
@@ -339,7 +292,7 @@ class SunCalc {
     }
 
     public Map<String, Double> getMoonIllumination(LocalDateTime date) {
-        double  d   = toDays(date);
+        double  d   = toJulian(date);
         
         HashMap<String,Double>  s = getSunCoordinates(d),
                                 m = getMoonCoordinates(d);
