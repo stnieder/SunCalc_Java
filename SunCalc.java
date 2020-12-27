@@ -1,4 +1,5 @@
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -31,71 +32,46 @@ class SunCalc {
     
     double dayMs = 1000 * 60 * 60 * 24,
         J1970 = 2440588,
-        J2000 = 2451545;
+        J2000 = 2451545,
+        HALFSECOND = 0.5;
+    
+    int JGREG= 15 + 31*(10+12*1582);
 
-    int BCE = 4713; //at 4713 BCE started the day calculation for the julian date
 
-
-    //Based on https://sciencing.com/calculate-julian-date-6465290.html
     public double toJulian(LocalDateTime date) {
         ZonedDateTime zdt = date.atZone(ZoneId.of("Europe/Vienna"));
         double result = zdt.toInstant().toEpochMilli(); //milliseconds since epoch
         result = result / dayMs - 0.5 + J1970;
 
-        System.out.println("toJulian.result: " + result);
-
         return result;
     }
 
-    //Based on https://www.aa.quae.nl/en/reken/juliaansedag.html#3_2
-    /*public LocalDateTime fromJulian(double jdn) { //jdn = julian day number
-        double k3 = 4 * (jdn - 1721120) + 3;
-        double x3 = Math.round(k3 / 146097);
-
-        double k2 = 100 * ((k3 % 146097) / 4) + 99;
-        int x2 = (int) k2 / 36525;
-
-        double k1 = 5 * ((k2 % 36525) / 100) + 2;
-        int x1 = (int) k1 / 153;
-
-        int c0 = (x1 + 2) / 12;
-
-        double year = 100 * x3 + x2 + c0;
-        int month = x1 - 12 * c0 + 3;
-        int day = (int) ((k1 % 153) / 5) + 1;
-
-        YearMonth yearMonthObject = YearMonth.of((int) year, month);
-        int daysInMonth = yearMonthObject.lengthOfMonth();
-        day = daysInMonth < day ? daysInMonth : day;
-        
-        return LocalDateTime.of((int) year, month, day, 0,0);        
-    }*/
-
     public String fromJulian(double jdn) {
 
-        // You have to use BigDecimal to get the biggest number possible, that
-        // is too big for double
+        //wrong calculations
 
-        double big_jdn = (jdn + 0.5 - J1970) * dayMs;
-        System.out.println("fromJulian.big_jdn: " + big_jdn);
-        double decimal = big_jdn % 1;
+        System.out.println("fromJulian.jdn: " + jdn);
 
-        double k3 = 4 * (big_jdn - 1721120) + 3;
-        double x3 = Math.round(k3 / 146097);
+        int jalpha,ja,jb,jc,jd,je,year,month,day;
+        double  julian = jdn,
+                decimal= jdn % 1;
+        ja = (int) julian;
+        if (ja>= JGREG) {
+            jalpha = (int) (((ja - 1867216) - 0.25) / 36524.25);
+            ja = ja + 1 + jalpha - jalpha / 4;
+        }
 
-        double k2 = 100 * ((k3 % 146097) / 4) + 99;
-        int x2 = (int) k2 / 36525;
+        jb = ja + 1524;
+        jc = (int) (6680.0 + ((jb - 2439870) - 122.1) / 365.25);
+        jd = 365 * jc + jc / 4;
+        je = (int) ((jb - jd) / 30.6001);
+        day = jb - jd - (int) (30.6001 * je);
+        month = je - 1;
+        if (month > 12) month = month - 12;
+        year = jc - 4715;
+        if (month > 2) year--;
+        if (year <= 0) year--;
 
-        double k1 = 5 * ((k2 % 36525) / 100) + 2;
-        int x1 = (int) k1 / 153;
-
-        int c0 = (x1 + 2) / 12;
-
-        double year = 100 * x3 + x2 + c0;
-        int month = x1 - 12 * c0 + 3;
-        int day = (int) ((k1 % 153) / 5) + 1;
-
-        
         double dhour = decimal * 24;
         int hour = (int) Math.round(dhour);
 
@@ -110,7 +86,7 @@ class SunCalc {
         int second = (int) Math.round(dsecond);
 
         LocalDateTime ldt = LocalDateTime.of(
-            (int) Math.round(year),
+            year,
             month,
             day,
             hour,
@@ -119,12 +95,8 @@ class SunCalc {
         );
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
         ZonedDateTime zdt = ZonedDateTime.of(ldt, ZoneId.of("UTC"));
-        
-        String result = dtf.format(zdt);
 
-        System.out.println("fromJulian.result: " + result);
-
-        return result;
+        return dtf.format(zdt);
     }
 
     public double toDays(LocalDateTime date) {
