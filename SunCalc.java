@@ -1,45 +1,31 @@
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.FormatStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.JulianFields;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TimeZone;
 
-/*
- (c) 2011-2015, Vladimir Agafonkin
- SunCalc is a JavaScript library for calculating sun/moon position and light phases.
- https://github.com/mourner/suncalc
-*/
 
 class SunCalc {
 
     private double PI  = Math.PI,
                   rad = PI / 180;
     
-    double dayMs = 1000 * 60 * 60 * 24,
+    private double dayMs = 1000 * 60 * 60 * 24,
         J1970 = 2440588,
         J2000 = 2451545,
         HALFSECOND = 0.5;
     
-    int JGREG= 15 + 31*(10+12*1582);
+    private int JGREG= 15 + 31*(10+12*1582);
 
 
-    public double toJulian(LocalDateTime date) {
+    private double toJulian(LocalDateTime date) {
         LocalTime timeOfDay = date.toLocalTime();
         double result = date.getLong(JulianFields.JULIAN_DAY);
         result += timeOfDay.get(ChronoField.MILLI_OF_DAY) / dayMs - 0.5;
@@ -47,7 +33,7 @@ class SunCalc {
         return result;
     }
 
-    public String fromJulian(double jdn) {
+    private String fromJulian(double jdn) {
         LocalDate date = LocalDate.EPOCH.with(JulianFields.JULIAN_DAY, (long) jdn);
         LocalDateTime result = date.atStartOfDay()
                 .plusHours(12)
@@ -58,7 +44,7 @@ class SunCalc {
 
 
     //General Calculations for Position
-    double e = rad * 23.4397; //Schieflage der Erde
+    private double e = rad * 23.4397; //Schieflage der Erde
 
     
     private double rightAscension(double l, double b) {
@@ -131,9 +117,9 @@ class SunCalc {
     }
 
 
-    ArrayList<Object[]> times = new ArrayList<Object[]>();
-    boolean initialized = false;
-    final Object[][] initalTimes = new Object[][] {
+    private ArrayList<Object[]> times = new ArrayList<Object[]>();
+    private boolean initialized = false;
+    private final Object[][] initalTimes = new Object[][] {
         {
             -0.833, "sunrise","sunset"
         },
@@ -165,11 +151,11 @@ class SunCalc {
         times.add(object);
     }
 
-    public ArrayList<Object[]> getAllSunTimes(){
+    private ArrayList<Object[]> getAllSunTimes(){
         return times;
     }
 
-    public int countSunTimes() {
+    private int countSunTimes() {
         if(!initialized) {
             Collections.addAll(times, initalTimes);
             initialized = true;
@@ -180,7 +166,7 @@ class SunCalc {
 
 
 
-    double J0 = 0.0009;
+    private double J0 = 0.0009;
 
     private double julianCycle(double d, double lw) {
         return Math.round(d - J0 - lw / (2 * PI));
@@ -202,7 +188,7 @@ class SunCalc {
         return -2.076 * Math.sqrt(height) / 60;
     }
 
-    public double getSetJ(double h, double lw, double phi, double dec, double n, double M, double L) {
+    private double getSetJ(double h, double lw, double phi, double dec, double n, double M, double L) {
         double w = hourAngle(h, phi, dec);
         double a = approxTransitJ(w, lw, n);
 
@@ -313,7 +299,7 @@ class SunCalc {
         return map;
     }
 
-    public static LocalDateTime hoursLater(LocalDate date, double hours) {
+    private static LocalDateTime hoursLater(LocalDate date, double hours) {
         return LocalDateTime.of(
             date.getYear(), 
             date.getMonth(), 
