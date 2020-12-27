@@ -1,7 +1,7 @@
 <project name="SunCalc">    
     <target name="compile">
         <javac srcdir="suncalc">
-            <include name="**/*.java">
+            <include name="**/*.java"></include>
         </javac>
     </target>
 
