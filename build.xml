@@ -1,23 +1,11 @@
-<project>
-    <target name="clean">
-        <delete dir="build"/>
-    </target>
-
+<project name="SunCalc">    
     <target name="compile">
-        <mkdir dir="build/classes"/>
-        <javac srcdir="suncalc" destdir="build/classes"/>
-    </target>
-
-    <target name="jar">
-        <mkdir dir="build/jar"/>
-        <jar destfile="build/jar/SunCalc.jar" basedir="build/classes">
-            <manifest>
-                <attribute name="Main-Class" value="suncalc.SunCalc"/>
-            </manifest>
-        </jar>
+        <javac srcdir="suncalc">
+            <include name="**/*.java">
+        </javac>
     </target>
 
     <target name="run">
-        <java jar="build/jar/SunCalc.jar"/>
+        <java sourcefile="Main.java"></java>
     </target>
 </project>
